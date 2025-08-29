@@ -63,10 +63,17 @@ def process_audio():
         print(f"Resposta do LLM: {llm_response_content}")
 
         # 3. Conversão de Texto para Fala (TTS) usando o modelo ElevenLabs-v3 via Poe
-        chat_tts_response = client.chat.completions.create(
-            model="ElevenLabs-v3",
-            messages=[{"role": "user", "content": llm_response_content}],
-        )
+        # chat_tts_response = client.chat.completions.create(
+        #     model="ElevenLabs-v3",
+        #     messages=[{"role": "user", "content": llm_response_content}],
+        # )
+        chat_tts_response = elevenlabs_client.text_to_speech.convert(
+            voice_id="JBFqnCBsd6RMkjVDRZzb",
+            output_format="mp3_44100_128",
+            text=llm_response_content,
+            model_id="eleven_multilingual_v2",
+)
+
         audio_url = chat_tts_response.choices[0].message.content
         print(f"URL do áudio gerado: {audio_url}")
 
