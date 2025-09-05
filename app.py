@@ -3,6 +3,7 @@ import requests
 from flask_cors import CORS
 import openai
 from elevenlabs.client import ElevenLabs
+from elevenlabs import play, save
 from io import BytesIO
 import tempfile
 import base64
@@ -11,7 +12,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-client = openai.OpenAI(
+poe_client = openai.OpenAI(
     api_key="3uYH4b-u9f5UqafLGpqrCG_VLjhPwyixTdmhAtYmXrc",
     base_url="https://api.poe.com/v1",
 )
@@ -20,6 +21,7 @@ elevenlabs_client = ElevenLabs(
   api_key="sk_b5562e737fe0a85859c9f3d574437eb872ac7ef960f3d99d",
 )
 
+################################################################################################################################################################################
 @app.route('/process_audio', methods=['POST'])
 def process_audio():
     if 'audio' not in request.files:
@@ -53,9 +55,52 @@ def process_audio():
         except Exception as e:
             print(f"Erro na transcrição: {e}")
             raise Exception(f"Erro na transcrição: {e}") # Propaga o erro para o bloco principal
+################################################################################################################################################################################
+# def process_audio(audio_file_path: str):
+#     """
+#     Processa um arquivo de áudio localizado em um caminho específico para transcrição
+#     de fala para texto (STT) usando ElevenLabs.
+
+#     Args:
+#         audio_file_path (str): O caminho completo para o arquivo de áudio a ser processado.
+
+#     Returns:
+#         str: O texto transcrito se a operação for bem-sucedida.
+
+#     Raises:
+#         FileNotFoundError: Se o arquivo de áudio especificado não for encontrado.
+#         Exception: Para quaisquer erros que ocorram durante o processo de transcrição.
+#     """
+#     # 1. Verifica se o arquivo existe no caminho fornecido
+#     if not os.path.exists(audio_file_path):
+#         raise FileNotFoundError(f"Arquivo de áudio não encontrado no caminho: {audio_file_path}")
+
+#     print(f"Processando arquivo de áudio de: {audio_file_path}")
+
+#     transcription_text = ""
+#     try:
+#         # 2. Abre o arquivo de áudio diretamente do caminho fornecido
+#         with open(audio_file_path, "rb") as file_to_transcribe:
+#             # 3. Realiza a transcrição de Fala para Texto (STT) com ElevenLabs
+#             # Certifique-se de que 'elevenlabs_client' está acessível (global ou passado como parâmetro)
+#             transcription_response = elevenlabs_client.speech_to_text.convert(
+#                 file=file_to_transcribe,
+#                 model_id="scribe_v1",
+#                 language_code="pt",
+#                 diarize=False,
+#             )
+#         transcription_text = transcription_response.text
+#         print(f"Transcrição concluída: {transcription_text}") 
+#         # return transcription_text
+#     # except Exception as e:
+#     #     print(f"Erro na transcrição: {e}")
+#     #     # Propaga o erro para que a função chamadora possa tratá-lo
+#     #     raise Exception(f"Erro na transcrição: {e}")
+
+################################################################################################################################################################################################################################################
 
         # 2. Interação com o Modelo de Linguagem (LLM)
-        chat_response = client.chat.completions.create(
+        chat_response = poe_client.chat.completions.create(
             model="Therabot-GPT",
             messages=[{"role": "user", "content": transcription_text}],
         )
@@ -72,26 +117,33 @@ def process_audio():
             output_format="mp3_44100_128",
             text=llm_response_content,
             model_id="eleven_multilingual_v2",
-)
+        )
 
-        audio_url = chat_tts_response.choices[0].message.content
-        print(f"URL do áudio gerado: {audio_url}")
+        #save(chat_tts_response, "teste_audio.mp3")
+        
+        # POE
+        # audio_url = chat_tts_response.choices[0].message.content
+        # print(f"URL do áudio gerado: {audio_url}")
 
         # 4. Baixar o Áudio Gerado e codificar em base64
-        response = requests.get(audio_url, stream=True)
-        response.raise_for_status()
+        # response = requests.get(audio_url, stream=True)
+        # response.raise_for_status()
 
-        audio_buffer = BytesIO()
-        for chunk in response.iter_content(chunk_size=8192):
-            audio_buffer.write(chunk)
-        audio_buffer.seek(0)
+        # audio_buffer = BytesIO()
+        # for chunk in response.iter_content(chunk_size=8192):
+        #     audio_buffer.write(chunk)
+        # audio_buffer.seek(0)
+
+        # ElevenLabs
+        audio_buffer = BytesIO(chat_tts_response)
+        audio_buffer.seek(0) # Não é estritamente necessário aqui, mas é uma boa prática
 
         # Codifica o áudio em Base64
         audio_base64 = base64.b64encode(audio_buffer.getvalue()).decode('utf-8')
         audio_mimetype = "audio/mpeg" # Assumindo MP3 do ElevenLabs-v3
 
         # Limpa o arquivo de áudio temporário de entrada
-        os.remove(temp_file_path)
+        # os.remove(temp_file_path)
 
         # Retorna um JSON com todos os dados
         return jsonify({
@@ -103,9 +155,27 @@ def process_audio():
     except Exception as e:
         print(f"Ocorreu um erro inesperado no backend: {e}")
         # Limpa o arquivo temporário se um erro ocorrer após sua criação
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        return jsonify({"error": f"Erro interno do servidor: {e}"}), 500
+        # if temp_file_path and os.path.exists(temp_file_path):
+        #     os.remove(temp_file_path)
+        # return jsonify({"error": f"Erro interno do servidor: {e}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
+#TESTE
+# # Exemplo de como você usaria a função:
+# if __name__ == "__main__":
+# #     # Defina o caminho para o seu arquivo de áudio
+# #     # Exemplo: se o arquivo 'meu_audio.webm' estiver na mesma pasta do script
+#     caminho_do_audio = "output.wav"
+
+# #     # Ou um caminho absoluto/relativo para outra pasta
+# #     # caminho_do_audio = "/caminho/para/sua/pasta/meu_audio.webm"
+
+#     try:
+#         transcricao = process_audio(caminho_do_audio)
+#         print(f"\nTranscrição final: {transcricao}")
+#     except FileNotFoundError as e:
+#         print(f"Erro: {e}")
+#     except Exception as e:
+#         print(f"Ocorreu um erro durante o processamento: {e}")
